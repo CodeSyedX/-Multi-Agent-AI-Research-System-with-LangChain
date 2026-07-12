@@ -1,172 +1,30 @@
-from agents import (
-    build_reader_agent,
-    build_search_agent,
-    writer_chain,
-    critic_chain
-)
-
+from graph import app
 
 def run_research_pipeline(topic: str) -> dict:
+    language = input("Enter preferred language (English/Hindi/etc): ").strip() or "English"
 
-    state = {}
+    initial_state = {
+        "topic": topic,
+        "language": language,
+        "search_results": "",
+        "scraped_content": "",
+        "report": "",
+        "feedback": "",
+        "revision_count": 0
+    }
 
-
-    # ---------------------------------
-    # Step 1: Search Agent
-    # ---------------------------------
-
-    print("\n" + "=" * 50)
-    print("Step 1 - Search Agent is working...")
-    print("=" * 50)
-
-
-    search_agent = build_search_agent()
-
-
-    search_result = search_agent.invoke(
-        {
-            "messages": [
-                (
-                    "user",
-                    f"Find recent, reliable and detailed information about: {topic}"
-                )
-            ]
-        }
-    )
-
-
-    state["search_results"] = (
-        search_result["messages"][-1].content
-    )
-
-
-    print(
-        "\nSearch Result:\n",
-        state["search_results"]
-    )
-
-
-
-    # ---------------------------------
-    # Step 2: Reader Agent
-    # ---------------------------------
+    print("\n🤖 Initiating LangGraph Research Workflow Node System...")
+    
+    final_state = app.invoke(initial_state)
 
     print("\n" + "=" * 50)
-    print("Step 2 - Reader Agent is scraping resources...")
+    print("🏆 FINAL COMPILED REPORT")
+    print("=" * 50)
+    print(final_state["report"])
     print("=" * 50)
 
-
-    reader_agent = build_reader_agent()
-
-
-    reader_result = reader_agent.invoke(
-        {
-            "messages": [
-                (
-                    "user",
-                    f"""
-Based on the following search results about "{topic}",
-pick the most relevant URL and scrape it for deeper content.
-
-Search Results:
-
-{state['search_results'][:800]}
-"""
-                )
-            ]
-        }
-    )
-
-
-    state["scraped_content"] = (
-        reader_result["messages"][-1].content
-    )
-
-
-    print(
-        "\nScraped Content:\n",
-        state["scraped_content"]
-    )
-
-
-
-    # ---------------------------------
-    # Step 3: Writer Agent
-    # ---------------------------------
-
-    print("\n" + "=" * 50)
-    print("Step 3 - Writer is drafting the report...")
-    print("=" * 50)
-
-
-
-    research_combined = (
-        f"""
-SEARCH RESULTS:
-
-{state['search_results']}
-
-
-DETAILED SCRAPED CONTENT:
-
-{state['scraped_content']}
-"""
-    )
-    language = input(
-    "\nEnter preferred language (English/Hindi/etc): "
-)
-
-    state["report"] = writer_chain.invoke(
-        {
-            "topic": topic,
-            "research": research_combined,
-            "language": language
-        }
-    )
-
-
-    print(
-        "\nFinal Report:\n",
-        state["report"]
-    )
-
-
-
-    # ---------------------------------
-    # Step 4: Critic Agent
-    # ---------------------------------
-
-    print("\n" + "=" * 50)
-    print("Step 4 - Critic is reviewing the report...")
-    print("=" * 50)
-
-
-    state["feedback"] = critic_chain.invoke(
-        {
-            "report": state["report"],
-            "language": language
-        }
-    )
-
-
-    print(
-        "\nCritic Report:\n",
-        state["feedback"]
-    )
-
-
-    return state
-
-
-
-# ---------------------------------
-# Main
-# ---------------------------------
+    return final_state
 
 if __name__ == "__main__":
-
-    topic = input(
-        "\nEnter a research topic: "
-    )
-
+    topic = input("\nEnter a research topic: ")
     run_research_pipeline(topic)

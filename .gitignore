@@ -1,2 +1,21 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python Cache & Compiled Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Chroma & DB Temporary Storage
+.chroma/
+chroma_db/
+chroma/
+*.db
+*.sqlite3
+
+# Environment Variables & Secrets
 .env
-*.env

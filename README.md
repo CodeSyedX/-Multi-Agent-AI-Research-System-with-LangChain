@@ -1,265 +1,308 @@
-# 🤖 Multi-Agent AI Research System with LangChain
+# 🤖 Cyber-Matrix Multi-Agent AI Research Engine with LangGraph
 
-An intelligent **Multi-Agent AI Research System** built using **LangChain** that automates the complete research workflow.
+An advanced, production-grade **Multi-Agent AI Research System** built with **LangGraph, LangChain, FastAPI, Hugging Face, ChromaDB**.
 
-The system leverages multiple AI agents that collaborate to:
-
-- 🔍 Search the web for reliable information
-- 📖 Scrape and extract detailed content
-- ✍️ Generate a structured research report
-- 📝 Critically review the generated report
-
-Instead of relying on a single LLM prompt, this project follows a **Multi-Agent Architecture**, where each agent is responsible for a specialized task.
+Unlike traditional single-prompt LLM applications, this project implements a **stateful autonomous research workflow** where multiple AI agents collaborate, critique, refine, and generate well-structured research reports with inline citations. The system combines **live web retrieval**, **local Retrieval-Augmented Generation (RAG)**, **iterative review loops**, and an interactive cyberpunk-inspired dashboard.
 
 ---
 
 # 🚀 Features
 
-- AI-powered Search Agent
-- Intelligent Reader Agent for web scraping
-- Report Writer Agent
-- Critic Agent for quality review
-- Multi-language report generation
-- Modular LangChain architecture
-- Easy to extend with new agents
+- 🕵️ **Autonomous Search Agent**
+  - Performs live web research using Tavily Search API.
+  - Collects relevant URLs, snippets, and metadata.
+
+- 🧠 **Privacy-First Local RAG**
+  - Uses **sentence-transformers/all-MiniLM-L6-v2**
+  - Generates embeddings locally.
+  - Stores vectors in an in-memory Chroma database.
+  - No cloud embedding APIs required.
+
+- ✍️ **Citation-Aware Writer Agent**
+  - Retrieves the most relevant semantic chunks.
+  - Produces structured reports.
+  - Automatically inserts inline citations like:
+    ```
+    [1]
+    [2]
+    [3]
+    ```
+
+- ⚖️ **Master Critic Agent**
+  - Reviews grammar
+  - Detects hallucinations
+  - Validates chronology
+  - Enforces timeline consistency
+  - Supports iterative refinement (up to 3 revision loops)
+
+- 🎨 **Finalizer Agent**
+  - Generates polished Markdown reports
+  - Creates a hyperlinked References section
+  - Maps citations to original sources automatically
+
+- 🌍 **Multi-Language Support**
+  - English
+  - Hindi
+  - Spanish
+  - French
+  - Easily extensible to additional languages
+
 
 ---
 
 # 🏗️ Project Architecture
 
-```
+```text
 CAPS/
 │
-├── .venv/
-├── __pycache__/
+├── .venv/                         # Virtual environment (ignored by Git)
+├── __pycache__/                   # Python cache
 │
-├── .env
+├── .env                           # API Keys
 ├── .gitignore
 ├── requirements.txt
 │
-├── agents.py          # Builds all AI agents
-├── tools.py           # Search & scraping tools
-├── pipeline.py        # Complete research workflow
+├── state.py                       # TypedDict research state
+├── tools.py                       # Tavily search & scraping utilities
+├── vector_store.py                # Local Chroma + Hugging Face embeddings
+├── graph.py                       # LangGraph workflow orchestration
+├── main.py                        # FastAPI backend
+├── pipeline.py                    # CLI research pipeline
+├── test_pipeline_units.py         # Unit tests
 │
 └── README.md
 ```
 
 ---
 
-# 🧠 Workflow
+# 🧠 Multi-Agent Workflow
+
+```text
+                    USER QUERY
+                        │
+                        ▼
+            ┌──────────────────────┐
+            │   Search Agent        │
+            │  Live Web Retrieval   │
+            └──────────────────────┘
+                        │
+                        ▼
+            ┌──────────────────────┐
+            │   Writer Agent        │
+            │ Local RAG + Citations │
+            └──────────────────────┘
+                        │
+                        ▼
+            ┌──────────────────────┐
+            │   Master Critic       │
+            │ Grammar + Validation  │
+            └──────────────────────┘
+                     │
+         Rejected ───┘
+              ▲
+              │
+      Maximum 3 Revision Loops
+              │
+              ▼
+            Approved
+                │
+                ▼
+        ┌────────────────────┐
+        │  Finalizer Agent   │
+        │ References Builder │
+        └────────────────────┘
+                │
+                ▼
+         Final Research Report
+```
+
+---
+
+# ⚙️ Core Agents
+
+## 🕵️ Search Agent (`search_node`)
+
+Responsibilities:
+
+- Searches the web using Tavily
+- Retrieves relevant URLs
+- Extracts snippets
+- Collects metadata
+- Returns structured search results
+
+---
+
+## ✍️ Writer Agent (`writer_node`)
+
+Responsibilities:
+
+- Cleans retrieved content
+- Splits text into chunks
+- Generates embeddings locally
+- Stores vectors inside ChromaDB
+- Retrieves top semantic matches
+- Generates a detailed report
+- Inserts inline citations
+
+Example:
 
 ```
-             User Topic
-                  │
-                  ▼
-        🔍 Search Agent
-                  │
-                  ▼
-       📖 Reader Agent
-                  │
-                  ▼
-       ✍️ Writer Agent
-                  │
-                  ▼
-       📝 Critic Agent
-                  │
-                  ▼
-        Final Research Report
+Artificial Intelligence is rapidly transforming healthcare.[1]
+
+Recent studies indicate significant improvements in diagnostic accuracy.[2]
 ```
 
 ---
 
-# 🤖 Agents
+## ⚖️ Master Critic Agent (`critic_node`)
 
-## 1. Search Agent
+Responsibilities:
 
-Responsible for:
+- Grammar validation
+- Hallucination detection
+- Timeline validation
+- Chronological consistency
+- Research quality evaluation
 
-- Searching the internet
-- Finding recent and reliable information
-- Collecting useful search results
+If issues are detected:
 
-### Output
+```
+Rejected
+↓
+Feedback Generated
+↓
+Writer Revises Draft
+↓
+Critic Reviews Again
+```
 
-- Relevant search summaries
-- URLs
-- Sources
+Maximum revision loops:
 
----
-
-## 2. Reader Agent
-
-Responsible for:
-
-- Selecting the most relevant URL
-- Scraping detailed content
-- Extracting important information
-
-### Output
-
-- Cleaned webpage content
-- Detailed research material
+```
+3
+```
 
 ---
 
-## 3. Writer Agent
+## 🎨 Finalizer Agent (`finalizing_node`)
 
-Responsible for:
+Responsibilities:
 
-- Combining search results
-- Using scraped content
-- Writing a professional research report
+- Reads approved report
+- Resolves citations
+- Generates references
+- Produces polished Markdown output
 
-Supports multiple languages.
+Example:
 
-### Output
+```markdown
+## References
 
-- Structured report
-- Headings
-- Explanations
-- Well-organized content
+[1] https://example.com/article
 
----
-
-## 4. Critic Agent
-
-Responsible for reviewing the generated report.
-
-Checks:
-
-- Accuracy
-- Completeness
-- Grammar
-- Structure
-- Missing information
-- Suggestions for improvement
+[2] https://example2.com/report
+```
 
 ---
 
-# ⚙️ Research Pipeline
+# 📦 Research State Schema
 
-The workflow is implemented inside **pipeline.py**.
-
-## Step 1 — Search
-
-The Search Agent receives the research topic and retrieves reliable information from the web.
+The pipeline maintains all workflow information inside a centralized TypedDict.
 
 ```python
-search_agent.invoke(...)
+class ResearchState(TypedDict):
+    topic: str
+    language: str
+    search_results: str
+    scraped_content: str
+    report: str
+    feedback: str
+    revision_count: int
+    source_map: dict
 ```
 
-Output is stored as:
+State variables are automatically shared between every LangGraph node.
 
-```python
-state["search_results"]
+---
+
+# 🧠 Local RAG Pipeline
+
+```text
+Live Search
+      │
+      ▼
+Collected Pages
+      │
+      ▼
+Text Cleaning
+      │
+      ▼
+Chunk Generation
+      │
+      ▼
+MiniLM Embeddings
+      │
+      ▼
+Chroma Vector Store
+      │
+      ▼
+Semantic Retrieval
+      │
+      ▼
+Writer Agent
 ```
 
 ---
 
-## Step 2 — Read
 
-The Reader Agent selects the most relevant URL from the search results and scrapes detailed content.
+# 🛠️ Technology Stack
 
-```python
-reader_agent.invoke(...)
-```
+## AI
 
-Output is stored as:
+- LangGraph
+- LangChain
+- Google Gemini
+- Hugging Face Transformers
 
-```python
-state["scraped_content"]
-```
+## Retrieval
 
----
+- ChromaDB
+- sentence-transformers
+- Local RAG
 
-## Step 3 — Write
-
-The Writer Agent combines:
-
-- Search results
-- Scraped webpage content
-
-The user can also choose the preferred report language.
-
-```python
-writer_chain.invoke(...)
-```
-
-Output is stored as:
-
-```python
-state["report"]
-```
-
----
-
-## Step 4 — Critic
-
-The Critic Agent evaluates the generated report and provides constructive feedback.
-
-```python
-critic_chain.invoke(...)
-```
-
-Output is stored as:
-
-```python
-state["feedback"]
-```
-
----
-
-# 📦 State Management
-
-The pipeline maintains all intermediate outputs inside a dictionary.
-
-```python
-state = {
-    "search_results": "...",
-    "scraped_content": "...",
-    "report": "...",
-    "feedback": "..."
-}
-```
-
-This makes the workflow easy to debug and extend.
-
----
-
-# 🛠️ Technologies Used
+## Backend
 
 - Python
-- LangChain
-- LangGraph
-- OpenAI / LLMs
-- Tavily Search
-- Web Scraping Tools
-- Prompt Engineering
-- Multi-Agent Systems
+- FastAPI
+
+
+
+## APIs
+
+- Tavily Search API
+- Gemini API
 
 ---
 
-# 📥 Installation
+# ⚙️ Installation
 
-Clone the repository:
-
-```bash
-git clone https://github.com/yourusername/Multi-Agent-AI-Research-System.git
-```
-
-Move into the project directory:
+## Clone Repository
 
 ```bash
-cd Multi-Agent-AI-Research-System
+git clone https://github.com/CodeSyedX/-Multi-Agent-AI-Research-System-with-LangChain.git
+
+cd -Multi-Agent-AI-Research-System-with-LangChain
 ```
 
-Create a virtual environment:
+---
+
+## Create Virtual Environment
 
 ```bash
 python -m venv .venv
 ```
 
-Activate the environment:
+Activate:
 
 ### Windows
 
@@ -273,7 +316,9 @@ Activate the environment:
 source .venv/bin/activate
 ```
 
-Install dependencies:
+---
+
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -281,108 +326,125 @@ pip install -r requirements.txt
 
 ---
 
-# 🔑 Environment Variables
+## Configure Environment Variables
 
-Create a `.env` file and add your API keys.
-
-Example:
+Create a `.env` file:
 
 ```env
-OPENAI_API_KEY=your_openai_api_key
+GOOGLE_API_KEY=your_gemini_api_key
 
 TAVILY_API_KEY=your_tavily_api_key
 ```
 
 ---
 
-# ▶️ Running the Project
+# 🧪 Run Unit Tests
 
-Run the pipeline:
+```bash
+python test_pipeline_units.py
+```
+
+This verifies:
+
+- Search utilities
+- Regex extraction
+- Local embeddings
+- Chroma indexing
+- Citation generation
+- Pipeline integrity
+
+---
+
+# ▶️ Run CLI Pipeline
 
 ```bash
 python pipeline.py
 ```
 
-Example:
+---
 
+# 🚀 Run FastAPI Backend
+
+```bash
+uvicorn main:app --reload
 ```
-Enter a research topic:
-
-Artificial Intelligence in Healthcare
-```
-
-Then select a language:
-
-```
-English
-```
-
-The system automatically:
-
-- Searches the web
-- Reads the best source
-- Generates a report
-- Reviews the report
 
 ---
 
-# 📌 Example Output
+# 🌐 Launch Frontend
 
+```bash
+cd frontend
+
+npm install
+
+npm run dev
 ```
-Enter research topic:
-Artificial Intelligence
 
-↓
+---
 
+# 📈 Workflow Summary
+
+```text
+User Query
+      │
+      ▼
 Search Agent
-
-↓
-
-Reader Agent
-
-↓
-
+      │
+      ▼
 Writer Agent
-
-↓
-
+      │
+      ▼
+Local RAG
+      │
+      ▼
 Critic Agent
-
-↓
-
-Final Research Report
+      │
+ Approved?
+   │
+   ├── No → Revision Loop
+   │
+   └── Yes
+          │
+          ▼
+Finalizer Agent
+          │
+          ▼
+Markdown Report
+          │
+          ▼
+Interactive Dashboard
 ```
 
 ---
 
-# 🔮 Future Improvements
+# 🔮 Future Enhancements
 
+- Persistent ChromaDB storage
 - PDF report generation
-- Citation management
-- Multi-source research
-- Research memory
-- Agent routing using LangGraph
-- Streamlit web interface
-- Export to Word/PDF
-- Research history database
-
----
-
-# 🎯 Learning Outcomes
-
-This project demonstrates:
-
-- Multi-Agent AI Systems
-- LangChain Agent Development
-- AI Workflow Orchestration
-- Prompt Engineering
-- Web Search Integration
-- Web Scraping
-- LLM Chains
-- Modular AI Architecture
+- Multi-document RAG
+- Streaming agent execution
+- Research history dashboard
+- User authentication
+- Docker deployment
+- Kubernetes support
+- Redis caching
+- Multi-model LLM routing
+- Real-time collaborative research
+- Export to DOCX and PDF
 
 ---
 
 # 📜 License
 
-This project is intended for educational and learning purposes.
+This project is licensed under the MIT License.
+
+---
+
+# 👨‍💻 Author
+
+**Syed Aafreen**
+
+AI Engineer • Full Stack Developer • Multi-Agent Systems Enthusiast
+
+If you found this project useful, consider giving it a ⭐ on GitHub.

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Multi-Agent Research Engine Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: #050505;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 255, 102, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 255, 102, 0.02) 0%, transparent 45%);
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom Matrix Neon Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00ff66; }
+        
+        /* 3D Glass Perspective Tilt Wrapper */
+        .perspective-stage {
+            perspective: 1200px;
+        }
+        .tilt-card {
+            transform: rotateX(12deg) rotateY(-5deg);
+            transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .tilt-card:hover {
+            transform: rotateX(0deg) rotateY(0deg) scale(1.01);
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.15);
+        }
+    </style>
+</head>
+<body class="text-gray-200 min-h-screen overflow-x-hidden flex flex-col antialiased">
+
+    <!-- Top Glow Status Bar -->
+    <header class="border-b border-[#00ff66]/10 bg-black/40 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="h-3 w-3 rounded-full bg-[#00ff66] animate-pulse shadow-[0_0_10px_#00ff66]"></div>
+            <h1 class="text-xl font-bold tracking-tight uppercase text-white">
+                Matrix Engine <span class="text-[#00ff66] font-light">v4.0</span>
+            </h1>
+        </div>
+        <div class="flex items-center gap-6 text-xs mono-font tracking-widest text-[#00ff66]/70">
+            <span>CORE STATUS: COMPILING</span>
+            <span>SYSTEM YEAR: 2026</span>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="flex-1 flex relative">
+
+        <!-- Sidebar: Historic Run Audits -->
+        <aside id="sidebar" class="w-80 border-r border-[#00ff66]/10 bg-black/60 backdrop-blur-xl p-6 hidden lg:flex flex-col justify-between transition-all duration-300">
+            <div class="flex flex-col h-full gap-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-bold tracking-wider uppercase text-[#00ff66]">Past Research Cycles</h2>
+                    <i data-lucide="database" class="w-4 h-4 text-gray-500"></i>
+                </div>
+                <!-- History Feed List -->
+                <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+                    <div class="p-3 rounded-lg border border-[#00ff66]/10 bg-black/40 cursor-pointer hover:border-[#00ff66]/40 transition group">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-sm font-medium text-white group-hover:text-[#00ff66] transition truncate w-48">Elon Musk Financials</span>
+                            <span class="text-[10px] mono-font bg-emerald-950 text-[#00ff66] px-1.5 py-0.5 rounded border border-[#00ff66]/20">EN</span>
+                        </div>
+                        <p class="text-[11px] text-gray-500 mono-font">2026-07-12 • APPROVED</p>
+                    </div>
+                    <div class="p-3 rounded-lg border border-white/5 bg-black/20 opacity-60 hover:opacity-100 transition cursor-pointer">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-sm font-medium text-gray-400 truncate w-48">Quantum Cryptography</span>
+                            <span class="text-[10px] mono-font bg-zinc-900 text-gray-400 px-1.5 py-0.5 rounded">HI</span>
+                        </div>
+                        <p class="text-[11px] text-gray-600 mono-font">2026-06-28 • ARCHIVED</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Core Control Panel Workspace -->
+        <section class="flex-1 p-6 md:p-8 space-y-8 overflow-y-auto max-w-7xl mx-auto w-full">
+
+            <!-- Configuration Engine Grid -->
+            <div class="p-6 rounded-xl border border-[#00ff66]/10 bg-black/40 backdrop-blur-xl relative overflow-hidden group">
+                <div class="absolute inset-0 bg-gradient-to-r from-[#00ff66]/5 to-transparent pointer-events-none opacity-50"></div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10 items-end">
+                    <div class="md:col-span-1 space-y-2">
+                        <label class="block text-xs uppercase tracking-wider text-[#00ff66] font-medium mono-font">Research Target Topic</label>
+                        <input id="topicInput" type="text" placeholder="Enter target domain matrix query..." 
+                            class="w-full bg-black/60 border border-[#00ff66]/20 focus:border-[#00ff66] rounded-lg px-4 py-3 text-white text-sm outline-none transition focus:shadow-[0_0_15px_rgba(0,255,102,0.1)]">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-xs uppercase tracking-wider text-[#00ff66] font-medium mono-font">Target Output Language</label>
+                        <select id="langInput" class="w-full bg-black/60 border border-[#00ff66]/20 focus:border-[#00ff66] rounded-lg px-4 py-3 text-white text-sm outline-none transition appearance-none cursor-pointer">
+                            <option value="English">English</option>
+                            <option value="Hindi">Hindi</option>
+                            <option value="Spanish">Spanish</option>
+                            <option value="French">French</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button id="initiateBtn" onclick="runMockPipeline()" class="w-full bg-gradient-to-r from-emerald-600 to-[#00ff66] hover:from-emerald-500 hover:to-[#00ff66] text-black font-bold uppercase tracking-wider text-xs py-3.5 px-6 rounded-lg transition-all duration-300 transform active:scale-95 shadow-[0_0_20px_rgba(0,255,102,0.2)] flex items-center justify-center gap-2">
+                            <i data-lucide="play" class="w-4 h-4 fill-black"></i>
+                            Initiate Research Pipeline
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inter-Agent 3D Flow Theater Map View -->
+            <div id="pipelineSection" class="hidden space-y-4">
+                <div class="flex items-center justify-between px-2">
+                    <h3 class="text-xs font-bold tracking-widest text-[#00ff66] uppercase mono-font">Active Pipeline Architecture Nodes</h3>
+                    <span id="globalProgressPercentage" class="text-xs font-bold text-[#00ff66] mono-font">0% COMPLETE</span>
+                </div>
+                
+                <div class="perspective-stage p-8 rounded-xl border border-[#00ff66]/10 bg-black/60 backdrop-blur-xl flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+                    
+                    <!-- Agent Card 1: Search -->
+                    <div id="node-search" class="tilt-card w-full md:w-1/4 p-4 rounded-xl border border-[#00ff66]/10 bg-black/40 text-center relative z-10 scale-95 opacity-50 transition-all duration-300">
+                        <div class="mx-auto w-10 h-10 rounded-full border border-gray-800 bg-zinc-900 flex items-center justify-center mb-3 node-icon-box">
+                            <i data-lucide="search" class="w-5 h-5 text-gray-500"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-white tracking-wide uppercase">Search Agent</h4>
+                        <p class="text-[11px] text-gray-500 mt-1 mono-font status-text">Sleeping</p>
+                    </div>
+
+                    <!-- Agent Card 2: Writer -->
+                    <div id="node-writer" class="tilt-card w-full md:w-1/4 p-4 rounded-xl border border-[#00ff66]/10 bg-black/40 text-center relative z-10 scale-95 opacity-50 transition-all duration-300">
+                        <div class="mx-auto w-10 h-10 rounded-full border border-gray-800 bg-zinc-900 flex items-center justify-center mb-3 node-icon-box">
+                            <i data-lucide="pen-tool" class="w-5 h-5 text-gray-500"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-white tracking-wide uppercase">Writer Agent</h4>
+                        <p class="text-[11px] text-gray-500 mt-1 mono-font status-text">Sleeping</p>
+                    </div>
+
+                    <!-- Agent Card 3: Critic -->
+                    <div id="node-critic" class="tilt-card w-full md:w-1/4 p-4 rounded-xl border border-[#00ff66]/10 bg-black/40 text-center relative z-10 scale-95 opacity-50 transition-all duration-300">
+                        <div class="mx-auto w-10 h-10 rounded-full border border-gray-800 bg-zinc-900 flex items-center justify-center mb-3 node-icon-box">
+                            <i data-lucide="shield-alert" class="w-5 h-5 text-gray-500"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-white tracking-wide uppercase">Critic Agent</h4>
+                        <p class="text-[11px] text-gray-500 mt-1 mono-font status-text">Sleeping</p>
+                    </div>
+
+                    <!-- Agent Card 4: Finalizer -->
+                    <div id="node-finalizer" class="tilt-card w-full md:w-1/4 p-4 rounded-xl border border-[#00ff66]/10 bg-black/40 text-center relative z-10 scale-95 opacity-50 transition-all duration-300">
+                        <div class="mx-auto w-10 h-10 rounded-full border border-gray-800 bg-zinc-900 flex items-center justify-center mb-3 node-icon-box">
+                            <i data-lucide="check-square" class="w-5 h-5 text-gray-500"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-white tracking-wide uppercase">Finalizing Agent</h4>
+                        <p class="text-[11px] text-gray-500 mt-1 mono-font status-text">Sleeping</p>
+                    </div>
+
+                </div>
+
+                <!-- Ticker System Terminal Logger -->
+                <div class="p-3 rounded-lg border border-[#00ff66]/10 bg-black/90 font-mono text-xs text-[#00ff66]/80 flex items-center gap-3">
+                    <span class="animate-pulse">⚡</span>
+                    <span id="terminalTicker">System idle. Waiting for target configuration variable parameter inputs...</span>
+                </div>
+            </div>
+
+            <!-- Report Window Core Display Content View -->
+            <div id="reportSection" class="hidden p-6 md:p-8 rounded-xl border border-[#00ff66]/10 bg-black/30 backdrop-blur-2xl relative space-y-6">
+                
+                <!-- Inner Layout Controls Bar -->
+                <div class="flex flex-wrap items-center justify-between pb-4 border-b border-gray-800 gap-4">
+                    <div class="flex items-center gap-3">
+                        <button onclick="speakReport()" class="bg-emerald-950 hover:bg-emerald-900 border border-[#00ff66]/30 px-3 py-1.5 rounded text-xs text-[#00ff66] flex items-center gap-2 tracking-wide font-medium">
+                            <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Audio Readout
+                        </button>
+                        <button onclick="toggleSignLanguageDrawer()" class="bg-zinc-900 hover:bg-zinc-800 border border-gray-700 px-3 py-1.5 rounded text-xs text-gray-300 flex items-center gap-2 tracking-wide font-medium">
+                            <i data-lucide="user" class="w-3.5 h-3.5 text-[#00ff66]"></i> Sign Interpreter
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="bg-zinc-900 hover:bg-zinc-800 px-3 py-1.5 rounded text-xs border border-gray-700 font-medium text-white transition">PDF</button>
+                        <button class="bg-zinc-900 hover:bg-zinc-800 px-3 py-1.5 rounded text-xs border border-gray-700 font-medium text-white transition">DOCX</button>
+                    </div>
+                </div>
+
+                <!-- Generated Text Canvas Window Output -->
+                <article class="prose prose-invert max-w-none text-gray-300 space-y-6">
+                    <!-- Target layout gets updated entirely by live server JSON injection payloads -->
+                </article>
+            </div>
+
+        </section>
+
+        <!-- Dynamic Floating Component Layer: Sign Language PIP Widget Window Frame Box -->
+        <div id="signLanguageDrawer" class="fixed bottom-6 right-6 w-56 h-72 rounded-xl border border-[#00ff66]/20 bg-black/80 backdrop-blur-2xl p-3 flex flex-col hidden shadow-[0_0_30px_rgba(0,255,102,0.1)] transition-all duration-300 z-50 animate-bounce">
+            <div class="flex items-center justify-between pb-2 border-b border-gray-800 mb-2">
+                <span class="text-[10px] tracking-wider uppercase font-bold text-[#00ff66] mono-font">Sign Interpreter PIP</span>
+                <button onclick="toggleSignLanguageDrawer()" class="text-gray-500 hover:text-white transition">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+            <!-- Video Canvas Loop placeholder area box -->
+            <div class="flex-1 bg-zinc-900/80 rounded-lg flex flex-col items-center justify-center text-center p-3 border border-white/5 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#00ff66]/10 to-transparent animate-pulse"></div>
+                <i data-lucide="accessibility" class="w-8 h-8 text-[#00ff66] mb-2"></i>
+                <p id="interpreterGloss" class="text-[11px] mono-font text-gray-400 uppercase tracking-widest px-1">STANDBY MODE</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- App Orchestration Engine Script Core Processing Loop Logic -->
+    <script>
+        // Init Lucide System Icon Elements
+        lucide.createIcons();
+
+        let currentUtterance = null;
+
+        function toggleSignLanguageDrawer() {
+            const drawer = document.getElementById('signLanguageDrawer');
+            drawer.classList.toggle('hidden');
+        }
+
+        function speakReport() {
+            if ('speechSynthesis' in window) {
+                if (window.speechSynthesis.speaking) {
+                    window.speechSynthesis.cancel();
+                    document.getElementById('interpreterGloss').innerText = "STANDBY MODE";
+                    return;
+                }
+                
+                const reportContent = document.getElementById('reportMarkdownText').innerText;
+                currentUtterance = new SpeechSynthesisUtterance(reportContent);
+                currentUtterance.rate = 1.05;
+                
+                currentUtterance.onstart = () => {
+                    document.getElementById('interpreterGloss').innerText = "TRANSLATING: AUDIO ON";
+                };
+                currentUtterance.onend = () => {
+                    document.getElementById('interpreterGloss').innerText = "STANDBY MODE";
+                };
+                
+                window.speechSynthesis.speak(currentUtterance);
+            } else {
+                alert("Web Speech synthesis engine interfaces are not supported in your browser client environment configuration.");
+            }
+        }
+
+        function updateNodeUI(nodeId, state) {
+            const targetNode = document.getElementById(nodeId);
+            if (!targetNode) return;
+            const statusText = targetNode.querySelector('.status-text');
+            const iconBox = targetNode.querySelector('.node-icon-box');
+            const icon = iconBox.querySelector('i');
+
+            // Wipe pre-existing configurations state colors tags
+            targetNode.classList.remove('opacity-50', 'scale-95', 'border-[#00ff66]/10', 'border-[#00ff66]', 'shadow-[0_0_20px_rgba(0,255,102,0.3)]');
+            iconBox.className = "mx-auto w-10 h-10 rounded-full flex items-center justify-center mb-3 node-icon-box";
+            
+            if (state === 'active') {
+                targetNode.classList.add('scale-100', 'border-[#00ff66]', 'shadow-[0_0_20px_rgba(0,255,102,0.3)]');
+                iconBox.classList.add('bg-emerald-950', 'border', 'border-[#00ff66]');
+                icon.className = "w-5 h-5 text-[#00ff66]";
+                statusText.innerText = "EXECUTING...";
+                statusText.className = "text-[11px] text-[#00ff66] mt-1 mono-font status-text animate-pulse";
+            } else if (state === 'passed') {
+                targetNode.classList.add('scale-95', 'opacity-90', 'border-emerald-800/60');
+                iconBox.classList.add('bg-zinc-900', 'border', 'border-emerald-600/30');
+                icon.className = "w-5 h-5 text-emerald-400";
+                statusText.innerText = "PASSED ✓";
+                statusText.className = "text-[11px] text-emerald-400 mt-1 mono-font status-text";
+            } else {
+                targetNode.classList.add('scale-95', 'opacity-50', 'border-[#00ff66]/10');
+                iconBox.classList.add('bg-zinc-900', 'border', 'border-gray-800');
+                icon.className = "w-5 h-5 text-gray-500";
+                statusText.innerText = "Sleeping";
+                statusText.className = "text-[11px] text-gray-500 mt-1 mono-font status-text";
+            }
+        }
+
+        function runMockPipeline() {
+            const queryTopic = document.getElementById('topicInput').value.trim();
+            const targetLang = document.getElementById('langInput').value;
+            
+            if (!queryTopic) {
+                alert("Please declare a valid target input topic execution parameter variable before initiation.");
+                return;
+            }
+
+            // Reveal hidden workspace layouts components
+            document.getElementById('pipelineSection').classList.remove('hidden');
+            document.getElementById('reportSection').classList.add('hidden');
+            
+            // Clear node layouts to defaults sleeping
+            ['node-search', 'node-writer', 'node-critic', 'node-finalizer'].forEach(n => updateNodeUI(n, 'sleeping'));
+
+            const ticker = document.getElementById('terminalTicker');
+            const globalPercent = document.getElementById('globalProgressPercentage');
+
+            ticker.innerText = "🕵️‍♂️ Spinning up streaming configurations event layers to backend servers...";
+            globalPercent.innerText = "5% INITIALIZING";
+            updateNodeUI('node-search', 'active');
+
+            // Establish direct SSE connection link stream context
+            const streamUrl = `http://127.0.0.1:8000/api/research/stream?topic=${encodeURIComponent(queryTopic)}&language=${encodeURIComponent(targetLang)}`;
+            const eventSource = new EventSource(streamUrl);
+
+            eventSource.addEventListener('node_update', (event) => {
+                const data = JSON.parse(event.data);
+                
+                // Track current active node from graph stream updates map
+                if (data.node === 'search_agent') {
+                    updateNodeUI('node-search', 'passed');
+                    updateNodeUI('node-writer', 'active');
+                    ticker.innerText = "✍️ Web Search execution complete. Writer agent calculating vector token arrays...";
+                    globalPercent.innerText = "35% COMPILING";
+                } else if (data.node === 'reader_agent') {
+                    ticker.innerText = "📖 Reader agent parsing deep target text content strings...";
+                    globalPercent.innerText = "50% PROCESSING";
+                } else if (data.node === 'writer_agent') {
+                    updateNodeUI('node-writer', 'passed');
+                    updateNodeUI('node-critic', 'active');
+                    ticker.innerText = "⚖️ Base report generated. Master Critic evaluating layout timeline compliance maps...";
+                    globalPercent.innerText = "75% AUDITING";
+                } else if (data.node === 'critic_agent') {
+                    updateNodeUI('node-critic', 'passed');
+                    updateNodeUI('node-finalizer', 'active');
+                    ticker.innerText = "🎨 Quality assurance approved. Finalizing node drawing index annotations...";
+                    globalPercent.innerText = "90% COMPILING";
+                }
+            });
+
+            eventSource.addEventListener('pipeline_complete', (event) => {
+                const data = JSON.parse(event.data);
+                eventSource.close(); // Prevent running hooks open loops
+
+                updateNodeUI('node-finalizer', 'passed');
+                ticker.innerText = "🏆 Pipeline workflow routine terminated successfully. Report data object rendered below.";
+                globalPercent.innerText = "100% SECURE";
+
+                const articleTextContainer = document.querySelector('#reportSection article');
+                
+                // Generate references footer block from python mapping dictionary state item variables
+                let referencesHtml = '';
+                if (data.source_map && Object.keys(data.source_map).length > 0) {
+                    const sortedSources = Object.entries(data.source_map).sort((a, b) => a[1].index - b[1].index);
+                    referencesHtml = sortedSources.map(([url, info]) => `
+                        <div class="flex items-center gap-3 p-2 bg-black/40 rounded border border-white/5">
+                            <span class="text-[#00ff66] font-bold">[${info.index}]</span>
+                            <a href="${url}" target="_blank" class="text-gray-300 hover:text-[#00ff66] underline transition">${info.title}</a>
+                        </div>
+                    `).join('');
+                } else {
+                    referencesHtml = `<p class="text-gray-500 italic">No external context vectors required.</p>`;
+                }
+
+                // Render document body safely back to view frame bounds
+                articleTextContainer.innerHTML = `
+                    <div class="border-l-2 border-[#00ff66] pl-4">
+                        <h1 class="text-2xl font-bold tracking-tight text-white mb-1">Executive Research Report: <span id="outputTopic" class="text-[#00ff66]">${queryTopic}</span></h1>
+                        <p class="text-xs text-gray-500 mono-font">System Reference Date Timestamp: 2026</p>
+                    </div>
+                    
+                    <div id="reportMarkdownText" class="text-sm leading-relaxed whitespace-pre-wrap text-gray-300 font-sans mt-4">${data.report}</div>
+
+                    <div class="pt-8 mt-8 border-t border-gray-900">
+                        <h4 class="text-xs font-bold uppercase text-[#00ff66] tracking-widest mono-font mb-4 flex items-center gap-2">
+                            📖 References & Source Links
+                        </h4>
+                        <div class="space-y-2 text-xs mono-font">
+                            ${referencesHtml}
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('reportSection').classList.remove('hidden');
+                if (!document.getElementById('signLanguageDrawer').classList.contains('hidden')) {
+                    document.getElementById('interpreterGloss').innerText = "PARSED: ARRAYS ALIGNED";
+                }
+            });
+
+            eventSource.addEventListener('error', (event) => {
+                const data = JSON.parse(event.data);
+                eventSource.close();
+                
+                ticker.innerText = `❌ Terminal Halt: ${data.message || 'Connection lost'}. Check Python console logs.`;
+                globalPercent.innerText = "SYSTEM CRASHED";
+                ['node-search', 'node-writer', 'node-critic', 'node-finalizer'].forEach(n => updateNodeUI(n, 'sleeping'));
+            });
+        }
+    </script>
+</body>
+</html>

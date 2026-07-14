@@ -8,3 +8,4 @@ class ResearchState(TypedDict):
     report: str
     feedback: str
     revision_count: int
+    source_map: dict

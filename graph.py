@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from state import ResearchState
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-# ⚡ Correctly import your actual custom tools from tools.py
+# Correctly import your actual custom tools from tools.py
 from tools import web_search, scrape_url  
 from vector_store import create_local_vector_db  
 
@@ -55,41 +55,61 @@ def reader_node(state: ResearchState) -> dict:
 
 def writer_node(state: ResearchState) -> dict:
     print("\n" + "=" * 50)
-    print("Step 3 - Writer drafting report using RAG Retrieval...")
+    print("Step 3 - Writer drafting report using Citations & RAG Retrieval...")
     print("=" * 50)
     
     topic = state["topic"]
     
-    # RAG Step: Initialize the local Chroma vector db using your custom scraped text
+    # Initialize the updated metadata-aware vector database using your custom scraped text
     retriever = create_local_vector_db(state["scraped_content"])
-    
-    # Query the vector db only for chunks relevant to our topic
     print(f"🔍 [RAG Engine] Fetching top context documents matching topic: '{topic}'")
     relevant_docs = retriever.invoke(topic)
     
-    # Combine just the retrieved chunks
-    rag_context = "\n\n".join([doc.page_content for doc in relevant_docs])
+    # Map each retrieved document chunk to a source index reference map
+    rag_context_blocks = []
+    source_reference_map = {}
     
-    feedback = state.get("feedback", "")
-    if feedback:
+    for idx, doc in enumerate(relevant_docs, start=1):
+        url = doc.metadata.get("source_url", "No Link Available")
+        title = doc.metadata.get("source_title", "Source Reference")
+        
+        # Track unique links to avoid duplicating reference tables
+        source_reference_map[url] = {"index": idx, "title": title}
+        
+        # Format the context block with a visible reference tag for the LLM
+        rag_context_blocks.append(f"--- [Source Reference ID: {idx}] ---\n{doc.page_content}")
+        
+    rag_context = "\n\n".join(rag_context_blocks)
+    
+    # Format the Source Reference Guide to teach the model how to link back
+    reference_guide = "\n".join([f"ID {item['index']}: {title} ({url})" for url, item in source_reference_map.items()])
+    
+    critic_notes = state.get("feedback", "")  # Uses key 'feedback' from your state
+    if critic_notes:
         print("🔄 Integrating Critic adjustments into RAG context...")
-        rag_context += f"\n\nCRITIC FEEDBACK TO FIX:\n\n{feedback}"
+        rag_context += f"\n\nCRITIC REVISION REQS TO FIX:\n{critic_notes}"
         
     prompt = ChatPromptTemplate.from_template(
-        "Write a highly professional and structured research report on the topic '{topic}' in the language: {language}.\n\n"
-        "Base your report strictly on this semantic RAG context retrieved from our database:\n{research}\n\n"
-        "Ensure clear headings, clean explanations, and an organized format."
+        "You are a professional research scientist. Draft a comprehensive report on '{topic}' in the language: {language}.\n\n"
+        "Guidelines for Citations:\n"
+        "1. You MUST use inline bracket citations like [1], [2] to reference facts from the context below.\n"
+        "2. Match the bracket ID exactly to the [Source Reference ID: X] provided in the text context block.\n"
+        "3. Do not create a bibliography footer or list links at the bottom yourself; your output must only use inline tags.\n\n"
+        "Factual Context:\n{research}\n\n"
+        "Source Reference Map Context:\n{reference_guide}"
     )
     
-    chain = prompt | llm
-    report = chain.invoke({
+    report = (prompt | llm).invoke({
         "topic": topic,
         "research": rag_context,
+        "reference_guide": reference_guide,
         "language": state["language"]
     })
     
     print("\nDraft Generated successfully.")
-    return {"report": report.content}
+    # Store the unique URL mapping dictionary inside our node response 
+    # so the Finalizer Node can read it later to print the reference table!
+    return {"report": report.content, "source_map": source_reference_map}
 
 def critic_node(state: ResearchState) -> dict:
     print("\n" + "=" * 50)
@@ -113,6 +133,28 @@ def critic_node(state: ResearchState) -> dict:
     current_revisions = state.get("revision_count", 0)
     return {"feedback": feedback.content, "revision_count": current_revisions + 1}
 
+def finalizing_node(state: ResearchState) -> dict:
+    print("\n" + "=" * 50)
+    print("Step 5 - Finalizing Agent compiling Citation Reference Table...")
+    print("=" * 50)
+    
+    report_text = state["report"]
+    source_map = state.get("source_map", {})
+    
+    # Generate a professional Markdown reference list using the stored map data
+    reference_footer = "\n\n### 📖 References & Source Links\n"
+    if source_map:
+        # Sort sources by their reference index sequence
+        sorted_sources = sorted(source_map.items(), key=lambda x: x[1]["index"])
+        for url, info in sorted_sources:
+            reference_footer += f"- **[{info['index']}]** [{info['title']}]({url})\n"
+    else:
+        reference_footer += "_No external references verified._\n"
+        
+    # Append the link index to the bottom of the final report text
+    final_output = report_text + reference_footer
+    return {"report": final_output}
+
 # --- Routing Logic ---
 def route_after_critic(state: ResearchState) -> str:
     feedback = state["feedback"].strip().upper()
@@ -130,6 +172,7 @@ workflow.add_node("search_agent", search_node)
 workflow.add_node("reader_agent", reader_node)
 workflow.add_node("writer_agent", writer_node)
 workflow.add_node("critic_agent", critic_node)
+workflow.add_node("finalizing_agent", finalizing_node)  # Added Finalizer Node
 
 workflow.add_edge(START, "search_agent")
 workflow.add_edge("search_agent", "reader_agent")
@@ -139,7 +182,8 @@ workflow.add_edge("writer_agent", "critic_agent")
 workflow.add_conditional_edges(
     "critic_agent",
     route_after_critic,
-    {"accept": END, "reject": "writer_agent"}
+    {"accept": "finalizing_agent", "reject": "writer_agent"}  # Routes through Finalizing Node on approval
 )
+workflow.add_edge("finalizing_agent", END)
 
 app = workflow.compile()

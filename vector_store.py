@@ -9,18 +9,17 @@ def create_local_vector_db(search_results_str: str):
     Parses structural search results, extracts text + source metadata,
     embeds them locally, and returns a metadata-aware Chroma retriever.
     """
-    # 1. Initialize local embedding weights
+    # 1. Initialize local embedding model
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2",
         model_kwargs={'device': 'cpu'}
     )
     
-    # 2. Parse out individual website blocks from your tools.py format
-    # Blocks are separated by "\n----------------\n"
+    # 2. Parse individual search result blocks from tools.py output
     blocks = search_results_str.split("\n----------------\n")
     raw_documents = []
     
-    for block in blocks:
+    for idx, block in enumerate(blocks, start=1):
         if not block.strip():
             continue
         
@@ -29,27 +28,35 @@ def create_local_vector_db(search_results_str: str):
         url_match = re.search(r"URL:\s*(.*)", block)
         snippet_match = re.search(r"Snippet:\s*(.*)", block, re.DOTALL)
         
-        title = title_match.group(1).strip() if title_match else "Unknown Source"
+        title = title_match.group(1).strip() if title_match else f"Source [{idx}]"
         url = url_match.group(1).strip() if url_match else "No Link Available"
-        content = snippet_match.group(1).strip() if snippet_match else block
         
-        # Construct a LangChain Document with explicit metadata mapping
+        if snippet_match:
+            content = snippet_match.group(1).strip()
+        else:
+            # Clean fallback if Snippet tag is missing
+            content = block.replace(title, "").replace(url, "").strip()
+        
         doc = Document(
             page_content=f"Source Title: {title}\nFact Content: {content}",
-            metadata={"source_url": url, "source_title": title}
+            metadata={"source_url": url, "source_title": title, "citation_id": f"[{idx}]"}
         )
         raw_documents.append(doc)
 
-    # 3. Split the documents while explicitly preserving their metadata attachments
+    if not raw_documents:
+        # Fallback empty document if input text parsing fails completely
+        raw_documents.append(Document(page_content=search_results_str, metadata={"source_url": "", "source_title": "Raw Data"}))
+
+    # 3. Split documents into chunks while retaining metadata
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
     split_docs = text_splitter.split_documents(raw_documents)
     
     print(f"📦 [RAG Engine] Indexing {len(split_docs)} metadata-tracked chunks into Chroma...")
     
+    # Instantiate in-memory Chroma instance
     vector_store = Chroma.from_documents(
         documents=split_docs, 
-        embedding=embeddings,
-        collection_name="cited_research_index"
+        embedding=embeddings
     )
     
     return vector_store.as_retriever(search_kwargs={"k": 4})

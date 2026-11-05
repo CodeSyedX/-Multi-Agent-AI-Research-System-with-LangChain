@@ -1,14 +1,11 @@
 from langchain_core.tools import tool
-
 import requests
 from bs4 import BeautifulSoup
 from tavily import TavilyClient
 import os
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 # Tavily client
 tavily = TavilyClient(
@@ -17,7 +14,48 @@ tavily = TavilyClient(
 
 
 # -----------------------------
-# Web Search Tool
+# Web Search Function (Structured for State & Source Map)
+# -----------------------------
+
+def web_search_with_sources(query: str, max_results: int = 5):
+    """
+    Performs web search and returns both structured source mapping 
+    for citations and raw search text for LLM consumption.
+    """
+    try:
+        results = tavily.search(
+            query=query,
+            max_results=max_results
+        )
+    except Exception as e:
+        return "", {}
+
+    output = []
+    source_map = {}
+
+    for idx, r in enumerate(results.get("results", []), start=1):
+        citation_key = f"[{idx}]"
+        
+        # Save structured source metadata for the finalizer agent
+        source_map[citation_key] = {
+            "title": r.get("title", f"Source {idx}"),
+            "url": r.get("url", ""),
+            "snippet": r.get("content", "")
+        }
+
+        # Formatted string snippet labeled with citation key
+        output.append(
+            f"""{citation_key} Title: {r.get('title')}
+URL: {r.get('url')}
+Snippet: {r.get('content')[:300]}"""
+        )
+
+    search_text = "\n----------------\n".join(output)
+    return search_text, source_map
+
+
+# -----------------------------
+# Web Search Tool (LangChain Tool Wrapper)
 # -----------------------------
 
 @tool
@@ -26,25 +64,8 @@ def web_search(query: str) -> str:
     Search the web for recent and reliable information.
     Returns titles, URLs and snippets.
     """
-
-    results = tavily.search(
-        query=query,
-        max_results=5
-    )
-
-    output = []
-
-    for r in results["results"]:
-        output.append(
-            f"""
-Title: {r['title']}
-URL: {r['url']}
-Snippet: {r['content'][:300]}
-"""
-        )
-
-    return "\n----------------\n".join(output)
-
+    search_text, _ = web_search_with_sources(query)
+    return search_text
 
 
 # -----------------------------
@@ -56,7 +77,6 @@ def scrape_url(url: str) -> str:
     """
     Scrape and return clean text content from a URL.
     """
-
     try:
         response = requests.get(
             url,
@@ -71,18 +91,9 @@ def scrape_url(url: str) -> str:
             "html.parser"
         )
 
-
-        # Remove unnecessary HTML
-        for tag in soup(
-            [
-                "script",
-                "style",
-                "nav",
-                "footer"
-            ]
-        ):
+        # Remove unnecessary HTML elements
+        for tag in soup(["script", "style", "nav", "footer"]):
             tag.decompose()
-
 
         text = soup.get_text(
             separator=" ",
@@ -90,7 +101,6 @@ def scrape_url(url: str) -> str:
         )
 
         return text[:3000]
-
 
     except Exception as e:
         return f"Could not scrape URL: {str(e)}"

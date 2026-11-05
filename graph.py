@@ -1,24 +1,44 @@
+import os
+import re
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 from langgraph.graph import StateGraph, START, END
 from state import ResearchState
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-# Correctly import your actual custom tools from tools.py
+
+# Custom tools from tools.py
 from tools import web_search, scrape_url  
 from vector_store import create_local_vector_db  
 
-# Initialize Gemini 3.5 Flash
+# Initialize Gemini with valid model identifier
 llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0.2)
+
+# --- Helper Functions ---
+def _extract_text_content(content) -> str:
+    """Helper to safely extract string text whether LLM returns a str or list of content blocks."""
+    if isinstance(content, list):
+        extracted = []
+        for block in content:
+            if isinstance(block, dict):
+                extracted.append(block.get("text", ""))
+            else:
+                extracted.append(str(block))
+        return "".join(extracted)
+    return str(content)
 
 # --- Define Nodes ---
 
 def search_node(state: ResearchState) -> dict:
     print("\n" + "=" * 50)
-    print("Step 1 - Search Agent executing query (Powered by Gemini 3.5 Flash)...")
+    print("Step 1 - Search Agent executing query...")
     print("=" * 50)
     
     topic = state['topic']
     try:
-        # Call your custom web search tool from tools.py using .invoke()
         results = web_search.invoke(topic)
     except Exception as e:
         print(f"Custom web search tool call failed: {e}")
@@ -33,7 +53,6 @@ def reader_node(state: ResearchState) -> dict:
     
     search_results = state["search_results"]
     
-    # Let Gemini 3.5 Flash parse the web search text and pick the absolute best URL to target
     prompt = ChatPromptTemplate.from_template(
         "You are an expert Reader Agent. Analyze these web search results and extract the single most relevant "
         "and reliable URL link to scrape. Respond with ONLY the raw URL string. Do not include markdown, spaces, or extra text.\n\n"
@@ -41,11 +60,11 @@ def reader_node(state: ResearchState) -> dict:
     )
     
     chain = prompt | llm
-    target_url = chain.invoke({"search_results": search_results[:2000]}).content.strip()
-    print(f"🎯 Target URL selected for deep scraping: {target_url}")
+    response = chain.invoke({"search_results": search_results[:2000]})
+    target_url = _extract_text_content(response.content).strip()
+    print(f"Target URL selected for deep scraping: {target_url}")
     
     try:
-        # Pass the extracted URL straight to your custom BeautifulSoup tool from tools.py
         scraped_text = scrape_url.invoke(target_url)
     except Exception as e:
         print(f"Scrape tool call failed: {e}")
@@ -60,33 +79,33 @@ def writer_node(state: ResearchState) -> dict:
     
     topic = state["topic"]
     
-    # Initialize the updated metadata-aware vector database using your custom scraped text
     retriever = create_local_vector_db(state["scraped_content"])
-    print(f"🔍 [RAG Engine] Fetching top context documents matching topic: '{topic}'")
+    print(f"Fetching top context documents matching topic: '{topic}'")
     relevant_docs = retriever.invoke(topic)
     
-    # Map each retrieved document chunk to a source index reference map
     rag_context_blocks = []
     source_reference_map = {}
     
     for idx, doc in enumerate(relevant_docs, start=1):
         url = doc.metadata.get("source_url", "No Link Available")
-        title = doc.metadata.get("source_title", "Source Reference")
+        title = doc.metadata.get("source_title", f"Source [{idx}]")
+        citation_key = f"[{idx}]"
         
-        # Track unique links to avoid duplicating reference tables
-        source_reference_map[url] = {"index": idx, "title": title}
+        # Key source_map by citation key for the finalizer node
+        source_reference_map[citation_key] = {
+            "index": idx,
+            "title": title,
+            "url": url
+        }
         
-        # Format the context block with a visible reference tag for the LLM
         rag_context_blocks.append(f"--- [Source Reference ID: {idx}] ---\n{doc.page_content}")
         
     rag_context = "\n\n".join(rag_context_blocks)
+    reference_guide = "\n".join([f"ID {item['index']}: {item['title']} ({item['url']})" for item in source_reference_map.values()])
     
-    # Format the Source Reference Guide to teach the model how to link back
-    reference_guide = "\n".join([f"ID {item['index']}: {title} ({url})" for url, item in source_reference_map.items()])
-    
-    critic_notes = state.get("feedback", "")  # Uses key 'feedback' from your state
+    critic_notes = state.get("feedback", "")
     if critic_notes:
-        print("🔄 Integrating Critic adjustments into RAG context...")
+        print("Integrating Critic adjustments into RAG context...")
         rag_context += f"\n\nCRITIC REVISION REQS TO FIX:\n{critic_notes}"
         
     prompt = ChatPromptTemplate.from_template(
@@ -99,17 +118,17 @@ def writer_node(state: ResearchState) -> dict:
         "Source Reference Map Context:\n{reference_guide}"
     )
     
-    report = (prompt | llm).invoke({
+    response = (prompt | llm).invoke({
         "topic": topic,
         "research": rag_context,
         "reference_guide": reference_guide,
         "language": state["language"]
     })
     
+    report_text = _extract_text_content(response.content)
+    
     print("\nDraft Generated successfully.")
-    # Store the unique URL mapping dictionary inside our node response 
-    # so the Finalizer Node can read it later to print the reference table!
-    return {"report": report.content, "source_map": source_reference_map}
+    return {"report": report_text, "source_map": source_reference_map}
 
 def critic_node(state: ResearchState) -> dict:
     print("\n" + "=" * 50)
@@ -123,35 +142,43 @@ def critic_node(state: ResearchState) -> dict:
     )
     
     chain = prompt | llm
-    feedback = chain.invoke({
+    response = chain.invoke({
         "report": state["report"],
         "language": state["language"]
     })
     
-    print("\nCritic Feedback:\n", feedback.content)
+    feedback_text = _extract_text_content(response.content)
+    print("\nCritic Feedback:\n", feedback_text)
     
     current_revisions = state.get("revision_count", 0)
-    return {"feedback": feedback.content, "revision_count": current_revisions + 1}
+    return {"feedback": feedback_text, "revision_count": current_revisions + 1}
 
 def finalizing_node(state: ResearchState) -> dict:
     print("\n" + "=" * 50)
     print("Step 5 - Finalizing Agent compiling Citation Reference Table...")
     print("=" * 50)
     
-    report_text = state["report"]
+    report_text = state.get("report", "")
     source_map = state.get("source_map", {})
     
-    # Generate a professional Markdown reference list using the stored map data
-    reference_footer = "\n\n### 📖 References & Source Links\n"
-    if source_map:
-        # Sort sources by their reference index sequence
-        sorted_sources = sorted(source_map.items(), key=lambda x: x[1]["index"])
-        for url, info in sorted_sources:
-            reference_footer += f"- **[{info['index']}]** [{info['title']}]({url})\n"
+    # Extract unique numerical citation tags like [1], [2] from report
+    used_markers = sorted(
+        list(set(re.findall(r'\[\d+\]', report_text))),
+        key=lambda x: int(x.strip("[]"))
+    )
+    
+    reference_footer = "\n\n### References & Source Links\n"
+    if used_markers:
+        for marker in used_markers:
+            if marker in source_map:
+                source_info = source_map[marker]
+                reference_footer += f"- **{marker}** [{source_info['title']}]({source_info['url']})\n"
+    elif source_map:
+        for key, info in source_map.items():
+            reference_footer += f"- **{key}** [{info['title']}]({info['url']})\n"
     else:
         reference_footer += "_No external references verified._\n"
         
-    # Append the link index to the bottom of the final report text
     final_output = report_text + reference_footer
     return {"report": final_output}
 
@@ -163,7 +190,7 @@ def route_after_critic(state: ResearchState) -> str:
     if "APPROVED" in feedback or revisions >= 3:
         return "accept"
     else:
-        print(f"\n🔄 [System] Critic rejected draft. Routing back to Writer. (Attempt {revisions}/3)")
+        print(f"\n[System] Critic rejected draft. Routing back to Writer. (Attempt {revisions}/3)")
         return "reject"
 
 # --- Build Workflow ---
@@ -172,7 +199,7 @@ workflow.add_node("search_agent", search_node)
 workflow.add_node("reader_agent", reader_node)
 workflow.add_node("writer_agent", writer_node)
 workflow.add_node("critic_agent", critic_node)
-workflow.add_node("finalizing_agent", finalizing_node)  # Added Finalizer Node
+workflow.add_node("finalizing_agent", finalizing_node)
 
 workflow.add_edge(START, "search_agent")
 workflow.add_edge("search_agent", "reader_agent")
@@ -182,7 +209,10 @@ workflow.add_edge("writer_agent", "critic_agent")
 workflow.add_conditional_edges(
     "critic_agent",
     route_after_critic,
-    {"accept": "finalizing_agent", "reject": "writer_agent"}  # Routes through Finalizing Node on approval
+    {
+        "accept": "finalizing_agent", 
+        "reject": "writer_agent"
+    }
 )
 workflow.add_edge("finalizing_agent", END)
 

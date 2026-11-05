@@ -1,107 +1,78 @@
-import os
-from dotenv import load_dotenv
+import unittest
 from state import ResearchState
 from vector_store import create_local_vector_db
 from graph import writer_node, finalizing_node
 
-# 1. Load credentials
-load_dotenv()
+class TestPipelineUnits(unittest.TestCase):
 
-def test_metadata_rag_and_nodes():
-    print("🧪 --- Starting Metadata & Citation Logic Unit Test --- 🧪\n")
-    
-    if not os.getenv("GOOGLE_API_KEY"):
-        print("❌ Error: GOOGLE_API_KEY not found in environment variables.")
-        return
+    def setUp(self):
+        self.sample_scraped_content = """
+Title: Tesla EV Market Expansion
+URL: https://example.com/tesla-ev
+Snippet: Tesla continues to lead the EV market with new automated assembly updates and LangGraph integration for research pipelines.
 
-    # Mock text matching the exact Title/URL/Snippet structural output format of tools.py
-    mock_search_results = """
-Title: Global EV Market Shifts 2026
-URL: https://evinsights.com/market-report
-Snippet: Electric vehicle manufacturing has accelerated globally in 2026. Tesla remains a dominant equity entity, while emerging solid-state battery tech reshapes standard factory lifecycles.
-----------------
-Title: Autonomous Systems and Multi-Agent Orchestration
-URL: https://ai-journal.org/langgraph-framework
-Snippet: LangGraph enables developers to build complex stateful graphs for multi-agent LLM systems. By tying state dictionaries to robust routing edges, systems become resilient against random schema exceptions.
+Title: Battery Tech Innovations
+URL: https://example.com/battery-tech
+Snippet: Next-gen lithium iron phosphate batteries offer 20% higher energy density in standard chassis models.
 """
+        self.sample_state: ResearchState = {
+            "topic": "Tesla EV market and LangGraph routing updates",
+            "language": "English",
+            "search_results": self.sample_scraped_content,
+            "scraped_content": self.sample_scraped_content,
+            "report": "",
+            "feedback": "",
+            "revision_count": 0,
+            "source_map": {}
+        }
 
-    # --- TEST 1: Vector Store & Metadata Splitting ---
-    print("⏳ Testing local Hugging Face embedding + metadata parsing...")
-    try:
-        retriever = create_local_vector_db(mock_search_results)
-        print("✨ Local cited Chroma DB compiled successfully in RAM.")
-        
-        # Pull mock documents to check if metadata survived chunking
-        test_docs = retriever.invoke("Tesla EV market")
-        print(f"🎯 Retrieved {len(test_docs)} relevant context blocks.")
-        
-        # Verify metadata dictionary fields are present
-        sample_doc = test_docs[0]
-        print(f"   [Metadata Check] Verified URL: {sample_doc.metadata.get('source_url')}")
-        print(f"   [Metadata Check] Verified Title: {sample_doc.metadata.get('source_title')}\n")
-        
-    except Exception as e:
-        print(f"❌ Test 1 Failed (Vector Store Metadata Split): {e}")
-        return
+    def test_01_vector_store_indexing(self):
+        print("\n🧪 --- Test 1: Testing local RAG indexing & metadata parsing ---")
+        retriever = create_local_vector_db(self.sample_scraped_content)
+        docs = retriever.invoke("Tesla EV market")
+        self.assertTrue(len(docs) > 0, "Retriever should return relevant document chunks.")
+        self.assertIn("source_url", docs[0].metadata, "Metadata should preserve source_url.")
+        print("✅ Test 1 Passed: Local vector store metadata indexed cleanly.")
 
-    # --- TEST 2: Writer Node & Citation Generation ---
-    print("⏳ Testing Writer Node citation generation behavior...")
-    # Seed an initial state dictionary matching ResearchState schema requirements
-    test_state: ResearchState = {
-        "topic": "Tesla EV market and LangGraph routing updates",
-        "language": "English",
-        "search_results": "", # Handled by raw content parameter injection inside the node logic
-        "scraped_content": mock_search_results, # Writer reads this to build DB
-        "report": "",
-        "feedback": "",
-        "revision_count": 0,
-        "source_map": {}
-    }
-    
-    try:
-        writer_output = writer_node(test_state)
-        print("✨ Writer Node executed successfully.")
+    def test_02_writer_node_execution(self):
+        print("\n🧪 --- Test 2: Testing Writer Node execution & source_map creation ---")
+        result = writer_node(self.sample_state)
+        
+        self.assertIn("report", result, "Writer node output must contain 'report'.")
+        self.assertIn("source_map", result, "Writer node output must contain 'source_map'.")
+        self.assertIsInstance(result["report"], str, "'report' must be a string.")
+        self.assertIsInstance(result["source_map"], dict, "'source_map' must be a dict.")
+        
         print("📝 --- Generated Draft Snippet ---")
-        print(writer_output["report"][:400] + "...\n")
-        
-        # Verify the tracking map dictionary populated correctly
-        print("🗺️ Stored Source Mapping Dictionary Object:")
-        print(writer_output["source_map"])
-        print("")
-        
-        # Update our running state dictionary with the output changes
-        test_state["report"] = writer_output["report"]
-        test_state["source_map"] = writer_output["source_map"]
-        
-    except Exception as e:
-        print(f"❌ Test 2 Failed (Writer Node processing): {e}")
-        return
+        print(result["report"][:250] + "...\n")
+        print("✅ Test 2 Passed: Writer node executed cleanly without type errors.")
 
-    # --- TEST 3: Finalizing Node Footer Construction ---
-    print("⏳ Testing Finalizing Node footer injection processing...")
-    try:
-        final_output = finalizing_node(test_state)
-        print("✨ Finalizing Node processed content cleanly.")
-        print("📝 --- Final Report Footer Inspection Block ---")
+    def test_03_finalizing_node_citation_mapping(self):
+        print("\n🧪 --- Test 3: Testing Finalizer Node citation resolution ---")
+        state_with_draft: ResearchState = {
+            "topic": "Tesla EV market",
+            "language": "English",
+            "search_results": "",
+            "scraped_content": "",
+            "report": "Tesla leads the market in automated assembly [1]. Battery density improved significantly [2].",
+            "feedback": "APPROVED",
+            "revision_count": 1,
+            "source_map": {
+                "[1]": {"index": 1, "title": "Tesla EV Market Expansion", "url": "https://example.com/tesla-ev"},
+                "[2]": {"index": 2, "title": "Battery Tech Innovations", "url": "https://example.com/battery-tech"}
+            }
+        }
         
-        # Isolate the final chunks to confirm the reference table rendered properly
-        report_lines = final_output["report"].split("\n")
-        footer_start_idx = 0
-        for i, line in enumerate(report_lines):
-            if "References & Source Links" in line:
-                footer_start_idx = i
-                break
-                
-        if footer_start_idx:
-            print("\n".join(report_lines[footer_start_idx:]))
-        else:
-            print("❌ Warning: Reference Footer block was not found in final string output.")
-            print(final_output["report"])
-            
-        print("\n🏆 --- ALL SYSTEM UNIT TESTS PASSED SUCCESSFUL --- 🏆")
+        final_result = finalizing_node(state_with_draft)
+        final_report = final_result["report"]
         
-    except Exception as e:
-        print(f"❌ Test 3 Failed (Finalizer footer compilation): {e}")
+        self.assertIn("## References & Source Links", final_report)
+        self.assertIn("https://example.com/tesla-ev", final_report)
+        self.assertIn("https://example.com/battery-tech", final_report)
+        
+        print("📝 --- Final Output Report with References ---")
+        print(final_report)
+        print("✅ Test 3 Passed: Finalizer node correctly mapped citation markers to real URLs.")
 
 if __name__ == "__main__":
-    test_metadata_rag_and_nodes()
+    unittest.main()

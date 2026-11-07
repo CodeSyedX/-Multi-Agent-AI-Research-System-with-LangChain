@@ -1,62 +1,32 @@
-import re
-from langchain_core.documents import Document
+import os
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import FastEmbedEmbeddings
 
-def create_local_vector_db(search_results_str: str):
-    """
-    Parses structural search results, extracts text + source metadata,
-    embeds them locally, and returns a metadata-aware Chroma retriever.
-    """
-    # 1. Initialize local embedding model
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={'device': 'cpu'}
+def retrieve_top_chunks(raw_text: str, query: str, top_k: int = 4) -> str:
+    """Splits raw text into chunks, embeds them locally via FastEmbed (0 API calls), 
+    and retrieves top_k relevant snippets using ChromaDB."""
+    if not raw_text.strip():
+        return raw_text
+
+    # 1. Chunk document into ~500 character segments with 50 character overlap
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=50,
+        separators=["\n\n", "\n", ". ", " ", ""]
     )
-    
-    # 2. Parse individual search result blocks from tools.py output
-    blocks = search_results_str.split("\n----------------\n")
-    raw_documents = []
-    
-    for idx, block in enumerate(blocks, start=1):
-        if not block.strip():
-            continue
-        
-        # Regex extraction for Title, URL, and Content
-        title_match = re.search(r"Title:\s*(.*)", block)
-        url_match = re.search(r"URL:\s*(.*)", block)
-        snippet_match = re.search(r"Snippet:\s*(.*)", block, re.DOTALL)
-        
-        title = title_match.group(1).strip() if title_match else f"Source [{idx}]"
-        url = url_match.group(1).strip() if url_match else "No Link Available"
-        
-        if snippet_match:
-            content = snippet_match.group(1).strip()
-        else:
-            # Clean fallback if Snippet tag is missing
-            content = block.replace(title, "").replace(url, "").strip()
-        
-        doc = Document(
-            page_content=f"Source Title: {title}\nFact Content: {content}",
-            metadata={"source_url": url, "source_title": title, "citation_id": f"[{idx}]"}
-        )
-        raw_documents.append(doc)
+    docs = text_splitter.create_documents([raw_text])
 
-    if not raw_documents:
-        # Fallback empty document if input text parsing fails completely
-        raw_documents.append(Document(page_content=search_results_str, metadata={"source_url": "", "source_title": "Raw Data"}))
+    # 2. Local ONNX embeddings via FastEmbed (0 Gemini API calls)
+    embeddings = FastEmbedEmbeddings(model_name="BAAI/bge-small-en-v1.5")
 
-    # 3. Split documents into chunks while retaining metadata
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
-    split_docs = text_splitter.split_documents(raw_documents)
-    
-    print(f"📦 [RAG Engine] Indexing {len(split_docs)} metadata-tracked chunks into Chroma...")
-    
-    # Instantiate in-memory Chroma instance
-    vector_store = Chroma.from_documents(
-        documents=split_docs, 
-        embedding=embeddings
-    )
-    
-    return vector_store.as_retriever(search_kwargs={"k": 4})
+    # 3. Embed & store chunks in an in-memory Chroma vector database
+    vector_db = Chroma.from_documents(documents=docs, embedding=embeddings)
+
+    # 4. Perform similarity search for top-k matching chunks
+    matching_docs = vector_db.similarity_search(query, k=top_k)
+
+    # 5. Concatenate matching chunks into clean context
+    retrieved_context = "\n\n---\n\n".join([doc.page_content for doc in matching_docs])
+
+    return retrieved_context

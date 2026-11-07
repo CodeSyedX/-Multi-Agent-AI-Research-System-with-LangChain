@@ -1,18 +1,14 @@
-# state.py
-from typing import TypedDict, List, Dict, Any
+from typing import TypedDict, List, Dict, Optional
 
-class ResearchState(TypedDict):
+class DualReportState(TypedDict):
     topic: str
-    language: str
-    search_results: str
-    scraped_content: str
-    report: str
-    feedback: str
-    revision_count: int
-    source_map: dict
-    
-    # Phase 2 Fields
-    flagged_contradictions: List[str]     # Questions surfaced by Contradiction Detector
-    student_synthesis: str                # Human student input/claim
-    challenge_history: List[Dict[str, str]] # Dialogue between Challenger Agent and Student
-    challenge_round: int                  # Track challenge rounds (max 3)
+    raw_source_text: str
+    extracted_data: str
+    ai_report: str
+    critic_feedback: str
+    critic_approved: bool
+    questions: List[str]
+    student_answers: List[str]
+    student_report: str
+    comparative_analysis: str
+    scores: Optional[Dict[str, int]]

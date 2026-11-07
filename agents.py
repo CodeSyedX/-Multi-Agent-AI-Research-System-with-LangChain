@@ -6,7 +6,10 @@ from langchain_community.tools.tavily_search import TavilySearchResults # ⚡ Di
 from vector_store import create_local_vector_db  
 
 # Initialize Gemini 3.5 Flash
-llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0.5)
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.5-flash-lite",
+    temperature=0.3
+)
 
 # --- Define Nodes ---
 

@@ -1,17 +1,17 @@
-from .extractor_agent import extractor_node
-from .ai_writer_agent import ai_writer_node
-from .critic_agent import critic_node
-from .question_generator_agent import question_generator_node
-from .student_hitl_agent import student_hitl_node
-from .student_writer_agent import student_writer_node
-from .evaluator_agent import evaluator_node
+from .curriculum_planner_agent import curriculum_planner_node
+from .module_content_agent import module_content_node
+from .tutor_critic_agent import tutor_critic_node
+from .module_hitl_agent import module_quiz_hitl_node
+from .capstone_generator_agent import capstone_generator_node
+from .project_hitl_agent import project_submission_hitl_node
+from .project_evaluator_agent import project_evaluator_node
 
 __all__ = [
-    "extractor_node",
-    "ai_writer_node",
-    "critic_node",
-    "question_generator_node",
-    "student_hitl_node",
-    "student_writer_node",
-    "evaluator_node",
+    "curriculum_planner_node",
+    "module_content_node",
+    "tutor_critic_node",
+    "module_quiz_hitl_node",
+    "capstone_generator_node",
+    "project_submission_hitl_node",
+    "project_evaluator_node"
 ]
